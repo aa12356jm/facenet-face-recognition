@@ -38,15 +38,9 @@ def concatenate(tensors, axis=-1):
 def LRN2D(x):
     return tf.nn.lrn(x, alpha=1e-4, beta=0.75)
 
-def conv2d_bn(x,
-              layer=None,
-              cv1_out=None,
-              cv1_filter=(1, 1),
-              cv1_strides=(1, 1),
-              cv2_out=None,
-              cv2_filter=(3, 3),
-              cv2_strides=(1, 1),
-              padding=None):
+def conv2d_bn(x, layer=None, cv1_out=None, cv1_filter=(1, 1), cv1_strides=(1, 1), cv2_out=None,
+              cv2_filter=(3, 3), cv2_strides=(1, 1), padding=None):
+
     num = '' if cv2_out == None else '1'
     tensor = Conv2D(cv1_out, cv1_filter, strides=cv1_strides, data_format='channels_first', name=layer+'_conv'+num)(x)
     tensor = BatchNormalization(axis=1, epsilon=0.00001, name=layer+'_bn'+num)(tensor)
@@ -61,6 +55,7 @@ def conv2d_bn(x,
     tensor = Activation('relu')(tensor)
     return tensor
 
+#网络中所有的层
 WEIGHTS = [
   'conv1', 'bn1', 'conv2', 'bn2', 'conv3', 'bn3',
   'inception_3a_1x1_conv', 'inception_3a_1x1_bn',
@@ -88,6 +83,7 @@ WEIGHTS = [
   'dense_layer'
 ]
 
+#每一层的输入和输出
 conv_shape = {
   'conv1': [64, 3, 7, 7],
   'conv2': [64, 64, 1, 1],
@@ -128,18 +124,21 @@ conv_shape = {
   'inception_5b_1x1_conv': [256, 736, 1, 1],
 }
 
+#加载模型权重
 def load_weights_from_FaceNet(FRmodel):
     # Load weights from csv files (which was exported from Openface torch model)
     weights = WEIGHTS
     weights_dict = load_weights()
 
     # Set layer weights of the model
+    #设置每一层的权重值
     for name in weights:
         if FRmodel.get_layer(name) != None:
             FRmodel.get_layer(name).set_weights(weights_dict[name])
         elif model.get_layer(name) != None:
             model.get_layer(name).set_weights(weights_dict[name])
 
+#加载权重，每一层的权重都放在一个csv文件中
 def load_weights():
     # Set weights path
     dirPath = './weights'
@@ -151,7 +150,7 @@ def load_weights():
         paths[n.replace('.csv', '')] = dirPath + '/' + n
 
     for name in WEIGHTS:
-        if 'conv' in name:
+        if 'conv' in name: #卷积层这样处理
             conv_w = genfromtxt(paths[name + '_w'], delimiter=',', dtype=None)
             conv_w = np.reshape(conv_w, conv_shape[name])
             conv_w = np.transpose(conv_w, (2, 3, 1, 0))
@@ -173,6 +172,7 @@ def load_weights():
     return weights_dict
 
 
+#加载训练集
 def load_dataset():
     train_dataset = h5py.File('datasets/train_happy.h5', "r")
     train_set_x_orig = np.array(train_dataset["train_set_x"][:]) # your train set features
@@ -189,15 +189,16 @@ def load_dataset():
     
     return train_set_x_orig, train_set_y_orig, test_set_x_orig, test_set_y_orig, classes
 
+#对传入的图像使用模型提取特征，编码为大小为128的向量
 def img_path_to_encoding(image_path, model):
     img1 = cv2.imread(image_path, 1)
     return img_to_encoding(img1, model)
     
-
+#对传入的图像使用模型提取特征，编码为大小为128的向量
 def img_to_encoding(image, model):
-    image = cv2.resize(image, (96, 96)) 
-    img = image[...,::-1]
-    img = np.around(np.transpose(img, (2,0,1))/255.0, decimals=12)
+    image = cv2.resize(image, (96, 96)) #将人脸缩放为96*96大小的图像
+    img = image[..., ::-1]      #由于opencv是BGR存储的，改为rgb模式
+    img = np.around(np.transpose(img, (2, 0, 1))/255.0, decimals=12)
     x_train = np.array([img])
-    embedding = model.predict_on_batch(x_train)
+    embedding = model.predict_on_batch(x_train)#对图像进行前向运算提取特征，为大小为128的向量
     return embedding
